@@ -4,22 +4,32 @@
   "version":6,
   "persistedvariables":{
     "ToInitiate":true,
-    "YamahaIp":""
+    "InitialList":[],
+    "FinalList":"[]",
+    "RegistrationCode":""
   },
+  "variables":{
+    "Iterator":0,
+    "NumDevicesFound":0
+  },
+  "buttons":{
+    "__CHECK":  {"label":"", "type":"http-get", "command":"DYNAMIK let spot = $InitialList; \"http://\" + spot[$Iterator].ip + \"/YamahaExtendedControl/v1/system/getDeviceInfo\"", "queryresult":"$.", "evalwrite":[{"variable":"FinalList", "value":"DYNAMIK let ml = JSON.parse(\"$FinalList\"); let spot = $InitialList; if (\"$Result\" != \"undefined\") {let mn = JSON.parse(\"$Result\").model_name; spot[$Iterator].long = mn; ml.push(spot[$Iterator]); let sml = JSON.stringify(JSON.stringify(ml)); sml.substring(1, sml.length-1)} else {let sml = JSON.stringify(JSON.stringify(ml)); sml.substring(1, sml.length-1)};"}, {"variable":"Iterator", "value":"DYNAMIK Number($Iterator)+1"}], "evaldo":[{"test":"DYNAMIK let spot = $InitialList; let b = Number($Iterator) < spot.length; b;", "then":"__CHECK", "or":""}, {"test":"DYNAMIK $Iterator == $NumDevicesFound", "then":"__PERSIST", "or":""}]}
+  },  
   "discover":{
-    "welcomeheadertext":"Yamaha Network Receiver",
-    "welcomedescription":"powered by meta\nby JAC459",
+    "welcomeheadertext":"Yamaha MusicCast Driver",
+    "welcomedescription":"powered by meta",
     "initcommandset":[
-      {"type":"mDNS", "command":"", "queryresult":"$[?(@.name=='Hometheater._airplay._tcp.local')]", "evalwrite":[{"variable":"YamahaIp","value":"DYNAMIK JSON.parse(\"$Result\").ip"}, {"variable":"ToInitiate","value":"DYNAMIK (JSON.parse(\"$Result\").ip == undefined)"}]}
+      {"type":"mDNS", "command":"", "queryresult":["$.[?(@property === \"short\" && @.match(/_airplay._tcp.local$/i))]^"], "evalwrite":[{"variable":"InitialList","value":"DYNAMIK let l = JSON.parse(\"$Result\"); JSON.stringify(l.filter(item=>{return item.ip!=undefined}))"}, {"variable":"NumDevicesFound","value":"DYNAMIK $InitialList.length"}, {"variable":"ToInitiate","value":false}], "evaldo":[{"test":true, "then":"__CHECK", "or":""}]}
     ],
-    "command": {"type":"http-get", "command":"http://$YamahaIp/YamahaExtendedControl/v1/system/getDeviceInfo", "queryresult":"$."}
+    "command": {"type":"static", "command":"DYNAMIK if ($Iterator == $NumDevicesFound) {JSON.parse(\"$FinalList\")} else {let res = [{\"long\":\"\", \"name\":\"Scanning...\", \"ip\":\"Not Found\"}]; res[0].long = Math.round(Number($Iterator)/Number($NumDevicesFound)*100) + \"% Complete. Refresh.\"; res;}", "queryresult":"$.*"}
   },
-  "template" : {
-    "dynamicname":"DYNAMIK_INST_START DYNAMIK \"Yamaha Network Receiver \" + JSON.parse(\"$Result\").model_name DYNAMIK_INST_END",
-    "dynamicid":"DYNAMIK_INST_START DYNAMIK JSON.parse(\"$Result\").device_id DYNAMIK_INST_END",
+
+  "template":{
+    "dynamicname":"DYNAMIK_INST_START DYNAMIK JSON.parse(\"$Result\").name.replace(\"_airplay._tcp.local\",\"\") + \" - \" + JSON.parse(\"$Result\").long DYNAMIK_INST_END",
+    "dynamicid":  "DYNAMIK_INST_START DYNAMIK JSON.parse(\"$Result\").name.replace(\"_airplay._tcp.local\",\"\") + \" - \" + JSON.parse(\"$Result\").ip DYNAMIK_INST_END",
     "variables":{
         "MyStatus":"",
-        "YamahaIp":"$YamahaIp",
+        "YamahaIp":"DYNAMIK_INST_START DYNAMIK JSON.parse(\"$Result\").ip DYNAMIK_INST_END",
         "IsMuted":true,
         "VolumePlayed":50,
         "InputName":"",
@@ -31,7 +41,7 @@
         "CurrentStatus" : {"label":"status", "listen":"MyStatus"}
     },
     "switches":{
-      "MUTE TOGGLE": {"label":"", "type":"static", "command":"", "evalwrite":[{"variable":"IsMuted","value":"DYNAMIK $IsMuted?false:true" }], "evaldo":[{"test":"DYNAMIK $IsMuted", "then":"__MUTEON", "or":"__MUTEOFF"}]}
+      "MUTE": {"label":"", "type":"static", "command":"", "evalwrite":[{"variable":"IsMuted","value":"DYNAMIK $IsMuted?false:true" }], "evaldo":[{"test":"DYNAMIK $IsMuted", "then":"__MUTEON", "or":"__MUTEOFF"}]}
     },
     "listeners":{
         "YamahaStatus" : {"type":"http-get", "command":"http://$YamahaIp/YamahaExtendedControl/v1/main/getStatus", "pooltime":"3000", "poolduration":"", "queryresult" : "$.", 
